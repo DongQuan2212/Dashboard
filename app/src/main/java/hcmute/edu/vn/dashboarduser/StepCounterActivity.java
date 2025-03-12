@@ -1,83 +1,85 @@
 package hcmute.edu.vn.dashboarduser;
 
+import android.Manifest;
+import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.hardware.Sensor;
-import android.hardware.SensorEvent;
-import android.hardware.SensorEventListener;
-import android.hardware.SensorManager;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
-import android.view.View;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
-public class StepCounterActivity extends AppCompatActivity implements SensorEventListener {
-    private SensorManager sensorManager;
-    private Sensor stepSensor;
-    private boolean isTracking = false;
-    private int stepCount = 0;
+public class StepCounterActivity extends AppCompatActivity {
+    private static final int PERMISSION_REQUEST_ACTIVITY_RECOGNITION = 100;
     private TextView stepCountText, statusText;
     private Button startButton, stopButton;
+
+    private int lastStepCount = 0;
+    private BroadcastReceiver stepReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_step_counter);
+
         stepCountText = findViewById(R.id.stepCountText);
         statusText = findViewById(R.id.statusText);
         startButton = findViewById(R.id.startButton);
         stopButton = findViewById(R.id.stopButton);
         ImageButton backButton = findViewById(R.id.backButton);
-        sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-        stepSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR);
-        backButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                finish(); // Quay về màn hình trước đó
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.ACTIVITY_RECOGNITION},
+                        PERMISSION_REQUEST_ACTIVITY_RECOGNITION);
             }
-        });
-        if (stepSensor == null) {
-            statusText.setText("Thiết bị không có cảm biến!");
-            startButton.setEnabled(false);
-            stopButton.setEnabled(false);
-        } else {
-            statusText.setText("Ready to track steps!");
-            startButton.setOnClickListener(v -> startTracking());
-            stopButton.setOnClickListener(v -> stopTracking());
         }
+
+        backButton.setOnClickListener(v -> finish());
+
+        startButton.setOnClickListener(v -> startTracking());
+        stopButton.setOnClickListener(v -> stopTracking());
+
+        // Nhận dữ liệu từ StepService
+        stepReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (intent.getAction().equals("STEP_UPDATE")) {
+                    lastStepCount = intent.getIntExtra("steps", 0);
+                    stepCountText.setText("Steps: " + lastStepCount);
+                }
+            }
+        };
     }
 
     private void startTracking() {
-        if (stepSensor != null && !isTracking) {
-            sensorManager.registerListener(this, stepSensor, SensorManager.SENSOR_DELAY_UI);
-            isTracking = true;
-            stepCount = 0;
-            stepCountText.setText("Steps: 0");
-            statusText.setText("Tracking started...");
-        }
+        statusText.setText("Tracking started...");
+        Intent serviceIntent = new Intent(this, StepService.class);
+        startService(serviceIntent);
     }
 
     private void stopTracking() {
-        if (isTracking) {
-            sensorManager.unregisterListener(this);
-            isTracking = false;
-            statusText.setText("Tracking stopped.");
-        }
+        statusText.setText("Tracking stopped.");
+        Intent serviceIntent = new Intent(this, StepService.class);
+        stopService(serviceIntent);
+        unregisterReceiver(stepReceiver);
     }
 
     @Override
-    public void onSensorChanged(SensorEvent event) {
-        if (isTracking && event.sensor.getType() == Sensor.TYPE_STEP_DETECTOR) {
-            stepCount++;
-            stepCountText.setText("Steps: " + stepCount);
+    protected void onDestroy() {
+        super.onDestroy();
+        try {
+            unregisterReceiver(stepReceiver);
+        } catch (IllegalArgumentException e) {
+            // Ignore nếu đã unregister
         }
-    }
-
-
-
-    @Override
-    public void onAccuracyChanged(Sensor sensor, int accuracy) {
-        // Not needed for step detector
     }
 }
