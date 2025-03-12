@@ -12,6 +12,7 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Build;
 import android.os.IBinder;
+
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
@@ -70,7 +71,7 @@ public class StepService extends Service implements SensorEventListener {
 
             lastStepCount = totalSteps - initialStepCount;
 
-            // Gửi số bước cập nhật về MainActivity
+            // Gửi số bước cập nhật về StepCounterActivity
             Intent stepUpdateIntent = new Intent("STEP_UPDATE");
             stepUpdateIntent.putExtra("steps", lastStepCount);
             sendBroadcast(stepUpdateIntent);

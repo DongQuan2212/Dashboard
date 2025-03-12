@@ -3,6 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH"/>
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION"/>
 
@@ -29,7 +30,16 @@
             android:name=".StepCounterActivity"
             android:exported="false"/>
         <service android:name=".StepService"
-                android:foregroundServiceType="health"/>
+            android:exported="false"
+                android:foregroundServiceType="health">
+        </service>
+        <receiver
+            android:name=".StepReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="STEP_UPDATE"/>
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

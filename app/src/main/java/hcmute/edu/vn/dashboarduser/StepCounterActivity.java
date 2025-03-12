@@ -1,7 +1,6 @@
 package hcmute.edu.vn.dashboarduser;
 
 import android.Manifest;
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -15,13 +14,13 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-public class StepCounterActivity extends AppCompatActivity {
+public class StepCounterActivity extends AppCompatActivity implements StepReceiver.StepUpdateListener {
     private static final int PERMISSION_REQUEST_ACTIVITY_RECOGNITION = 100;
     private TextView stepCountText, statusText;
     private Button startButton, stopButton;
 
-    private int lastStepCount = 0;
-    private BroadcastReceiver stepReceiver;
+    private StepReceiver stepReceiver;
+    private boolean isReceiverRegistered = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,20 +43,13 @@ public class StepCounterActivity extends AppCompatActivity {
         }
 
         backButton.setOnClickListener(v -> finish());
-
         startButton.setOnClickListener(v -> startTracking());
         stopButton.setOnClickListener(v -> stopTracking());
 
-        // Nhận dữ liệu từ StepService
-        stepReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                if (intent.getAction().equals("STEP_UPDATE")) {
-                    lastStepCount = intent.getIntExtra("steps", 0);
-                    stepCountText.setText("Steps: " + lastStepCount);
-                }
-            }
-        };
+        // Đăng ký StepReceiver với interface StepUpdateListener
+        stepReceiver = new StepReceiver(this);
+        registerReceiver(stepReceiver, new IntentFilter("STEP_UPDATE"), Context.RECEIVER_NOT_EXPORTED);
+        isReceiverRegistered = true;
     }
 
     private void startTracking() {
@@ -70,16 +62,25 @@ public class StepCounterActivity extends AppCompatActivity {
         statusText.setText("Tracking stopped.");
         Intent serviceIntent = new Intent(this, StepService.class);
         stopService(serviceIntent);
-        unregisterReceiver(stepReceiver);
+
+        if (isReceiverRegistered) {
+            unregisterReceiver(stepReceiver);
+            isReceiverRegistered = false;
+        }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        try {
+        if (isReceiverRegistered) {
             unregisterReceiver(stepReceiver);
-        } catch (IllegalArgumentException e) {
-            // Ignore nếu đã unregister
+            isReceiverRegistered = false;
         }
+    }
+
+    // Cập nhật UI khi nhận số bước mới từ StepReceiver
+    @Override
+    public void onStepUpdate(int steps) {
+        runOnUiThread(() -> stepCountText.setText("Steps: " + steps));
     }
 }
